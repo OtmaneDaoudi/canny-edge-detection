@@ -25,26 +25,15 @@ class CannyEdgeDetector:
     SOBEL_Y = np.array([[1, 2, 1], [0, 0, 0], [-1, -2, -1]])
 
     KERNEL_SIZE = 5
-    KERNEL_SD = 1
+    KERNEL_SD = 1.5
 
-    HIGH_THRESHOLD_RATIO = 0.1
-    LOW_THRESHOLD_RATIO = 0.04
+    HIGH_THRESHOLD_RATIO = 0.09
+    LOW_THRESHOLD_RATIO = 0.03
 
     WEAK_PIXEL = 25
 
     def __init__(self, img: Image) -> None:
         self.img = img
-
-    def intensityGradient(self) -> List[np.array]:
-        Gx = convolve2d(self.img.data, self.SOBEL_X)
-        Gy = convolve2d(self.img.data, self.SOBEL_Y)
-
-        O = np.arctan2(Gy, Gx) * 180 / np.pi
-
-        G = np.hypot(Gx, Gy)
-        G = 255 * (G / G.max())
-
-        return G, O
 
     def __gaussianKernel__(self, n: int, s: float) -> np.array:
         """ Returns a gaussian kernel with a given dimension n and standard deviation s """
@@ -62,6 +51,19 @@ class CannyEdgeDetector:
         """ Apply the gaussian filter on the image """
         kernel = self.__gaussianKernel__(self.KERNEL_SIZE, self.KERNEL_SD)
         return Image(data=convolve2d(self.img.data, kernel))
+    
+    def intensityGradient(self) -> List[np.array]:
+        gaussian_filter_image = self.gaussianFilter().data
+        Gx = convolve2d(gaussian_filter_image, self.SOBEL_X)
+        Gy = convolve2d(gaussian_filter_image, self.SOBEL_Y)
+
+        O = np.arctan2(Gy, Gx) * 180 / np.pi
+
+        G = np.hypot(Gx, Gy)
+        G = 255 * (G / G.max())
+
+        return G, O
+
 
     def nonMaximumSuppression(self) -> Image:
         """ On a given gradient direction, if current pixel is local maxima it is preserved, 0 otherwise """
@@ -153,8 +155,8 @@ if __name__ == '__main__':
     # img_grads = Image(data=grads)
     # img_grads.plot()
 
-    # suppression = ced.nonMaximumSuppression()
-    # suppression.plot()
+    suppression = ced.nonMaximumSuppression()
+    suppression.plot()
 
     double_thresholding = ced.doubleThreshold()
     double_thresholding.plot()
