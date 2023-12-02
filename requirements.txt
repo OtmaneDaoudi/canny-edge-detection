@@ -1,2 +1,2 @@
-pillow
+opencv-python
 numpy
