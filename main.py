@@ -16,9 +16,7 @@ class Image:
             self.data = data
 
     def plot(self) -> None:
-        max_ = np.max(self.data)
-        min_ = np.min(self.data)
-        plt.imshow(self.data, cmap="gray", vmin=min_, vmax=max_)
+        plt.imshow(self.data, cmap="gray", vmin=0, vmax=255)
         plt.show()
 
 
@@ -27,7 +25,12 @@ class CannyEdgeDetector:
     SOBEL_Y = np.array([[1, 2, 1], [0, 0, 0], [-1, -2, -1]])
 
     KERNEL_SIZE = 5
-    KERNEL_SD = 1.41
+    KERNEL_SD = 1
+
+    HIGH_THRESHOLD_RATIO = 0.1
+    LOW_THRESHOLD_RATIO = 0.04
+
+    WEAK_PIXEL = 25
 
     def __init__(self, img: Image) -> None:
         self.img = img
@@ -35,11 +38,16 @@ class CannyEdgeDetector:
     def intensityGradient(self) -> List[np.array]:
         Gx = convolve2d(self.img.data, self.SOBEL_X)
         Gy = convolve2d(self.img.data, self.SOBEL_Y)
-        G = np.sqrt(Gx ** 2 + Gy ** 2)
-        O = np.arctan2(Gy, Gx)
+
+        O = np.arctan2(Gy, Gx) * 180 / np.pi
+
+        G = np.hypot(Gx, Gy)
+        G = 255 * (G / G.max())
+
         return G, O
 
     def __gaussianKernel__(self, n: int, s: float) -> np.array:
+        """ Returns a gaussian kernel with a given dimension n and standard deviation s """
         k = (n-1) / 2
         kernel = np.zeros((n, n))
         for i in range(1, n+1):
@@ -51,24 +59,105 @@ class CannyEdgeDetector:
         return kernel
 
     def gaussianFilter(self) -> Image:
+        """ Apply the gaussian filter on the image """
         kernel = self.__gaussianKernel__(self.KERNEL_SIZE, self.KERNEL_SD)
         return Image(data=convolve2d(self.img.data, kernel))
+
+    def nonMaximumSuppression(self) -> Image:
+        """ On a given gradient direction, if current pixel is local maxima it is preserved, 0 otherwise """
+        height, width = self.img.data.shape
+        gradients, angle = self.intensityGradient()
+        angle[angle < 0] += 180
+
+        for i in range(1, height - 1):
+            for j in range(1, width - 1):
+                # angle 0
+                if (0 <= angle[i, j] < 22.5) or (157.5 <= angle[i, j] <= 180):
+                    q = gradients[i, j+1]
+                    r = gradients[i, j-1]
+                # angle 45
+                elif (22.5 <= angle[i, j] < 67.5):
+                    q = gradients[i-1, j+1]
+                    r = gradients[i+1, j-1]
+                # angle 90
+                elif (67.5 <= angle[i, j] < 112.5):
+                    q = gradients[i+1, j]
+                    r = gradients[i-1, j]
+                # angle 135
+                elif (112.5 <= angle[i, j] < 157.5):
+                    q = gradients[i-1, j-1]
+                    r = gradients[i+1, j+1]
+
+                if not ((gradients[i, j] >= q) and (gradients[i, j] >= r)):
+                    gradients[i, j] = 0
+        return Image(data=gradients)
+
+    def doubleThreshold(self) -> Image:
+        supressed_img = self.nonMaximumSuppression().data
+
+        # ThreshHolds ?
+        highThreshold = np.max(supressed_img) * self.HIGH_THRESHOLD_RATIO
+        lowThreshold = highThreshold * self.LOW_THRESHOLD_RATIO
+
+        # Pixels who are above the highTreshold should be replaced with 255 as an indicator that they are strong edges
+        # Pixels who are below the lowTreshold should be replaced with 0 as an indicator that they are not edges
+        # Pixels who are between the high and low tresholds should be replaced with 127 as an indicator that they are weak edges
+
+        height, width = supressed_img.shape
+
+        for i in range(0, height):
+            for j in range(0, width):
+                if (supressed_img[i][j] > highThreshold):
+                    supressed_img[i][j] = 255
+                elif (supressed_img[i][j] < lowThreshold):
+                    supressed_img[i][j] = 0
+                else:
+                    supressed_img[i][j] = self.WEAK_PIXEL
+
+        return Image(data=supressed_img)
+
+    def hystheresisTracking(self) -> Image:
+        double_threshold_image = self.doubleThreshold().data
+        height, width = double_threshold_image.shape
+
+        for i in range(0, height):
+            for j in range(0, width):
+                if double_threshold_image[i][j] == 127:
+                    found = False
+                    for u in [i-1, i, i+1]:
+                        for v in [j-1, j, j+1]:
+                            if u == i and v == j:
+                                continue
+                            if u >= 0 and u < height and v >= 0 and v < width:
+                                if (double_threshold_image[u][v] == 255):
+                                    double_threshold_image[i][j] = 255
+                                    found = True
+                                    break
+                        if found:
+                            break
+                    if found == False:
+                        double_threshold_image[i][j] = 0
+        return Image(data=double_threshold_image)
 
 
 if __name__ == '__main__':
     img = Image('women.jpg')
     ced = CannyEdgeDetector(img)
 
-    img.plot()
-
-    gauss_filter_img = ced.gaussianFilter()
-    gauss_filter_img.plot()
-
-    grads = ced.intensityGradient()[0]
-    img_grads = Image(data=grads)
-    img_grads.plot()
-
-    # grad = CannyEdgeDetector(img).intensityGradient()[0]
-    # img_grad = Image(data=grad)
     # img.plot()
-    # img_grad.plot()
+
+    # gauss_filter_img = ced.gaussianFilter()
+    # gauss_filter_img.plot()
+
+    # grads = ced.intensityGradient()[0]
+    # img_grads = Image(data=grads)
+    # img_grads.plot()
+
+    # suppression = ced.nonMaximumSuppression()
+    # suppression.plot()
+
+    double_thresholding = ced.doubleThreshold()
+    double_thresholding.plot()
+
+    hysteresis = ced.hystheresisTracking()
+    hysteresis.plot()
