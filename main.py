@@ -7,7 +7,7 @@ from math import pi, exp
 
 
 class Image:
-    def __init__(self, path: str = None, data: np.array = None):
+    def __init__(self, path: str = None, data: np.array = None) -> None:
         if path:
             data = cv2.imread(path)
             # grey scale data
@@ -50,12 +50,12 @@ class CannyEdgeDetector:
     def gaussianFilter(self) -> Image:
         """ Apply the gaussian filter on the image """
         kernel = self.__gaussianKernel__(self.KERNEL_SIZE, self.KERNEL_SD)
-        return Image(data=convolve2d(self.img.data, kernel))
-    
+        return Image(data=convolve2d(self.img.data, kernel, mode="same"))
+
     def intensityGradient(self) -> List[np.array]:
         gaussian_filter_image = self.gaussianFilter().data
-        Gx = convolve2d(gaussian_filter_image, self.SOBEL_X)
-        Gy = convolve2d(gaussian_filter_image, self.SOBEL_Y)
+        Gx = convolve2d(gaussian_filter_image, self.SOBEL_X, mode="same")
+        Gy = convolve2d(gaussian_filter_image, self.SOBEL_Y, mode="same")
 
         O = np.arctan2(Gy, Gx) * 180 / np.pi
 
@@ -63,7 +63,6 @@ class CannyEdgeDetector:
         G = 255 * (G / G.max())
 
         return G, O
-
 
     def nonMaximumSuppression(self) -> Image:
         """ On a given gradient direction, if current pixel is local maxima it is preserved, 0 otherwise """
@@ -143,17 +142,17 @@ class CannyEdgeDetector:
 
 
 if __name__ == '__main__':
-    img = Image('women.jpg')
+    img = Image('img/women.jpg')
     ced = CannyEdgeDetector(img)
 
-    # img.plot()
+    img.plot()
 
-    # gauss_filter_img = ced.gaussianFilter()
-    # gauss_filter_img.plot()
+    gauss_filter_img = ced.gaussianFilter()
+    gauss_filter_img.plot()
 
-    # grads = ced.intensityGradient()[0]
-    # img_grads = Image(data=grads)
-    # img_grads.plot()
+    grads = ced.intensityGradient()[0]
+    img_grads = Image(data=grads)
+    img_grads.plot()
 
     suppression = ced.nonMaximumSuppression()
     suppression.plot()
