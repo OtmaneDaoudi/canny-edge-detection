@@ -1,11 +1,12 @@
 import cv2
+import sys
 import numpy as np
+import matplotlib.pyplot as plt
 from typing import List
 from scipy.signal import convolve2d
-import matplotlib.pyplot as plt
 from math import pi, exp
 
-
+ 
 class Image:
     def __init__(self, path: str = None, data: np.array = None) -> None:
         if path:
@@ -18,6 +19,9 @@ class Image:
     def plot(self) -> None:
         plt.imshow(self.data, cmap="gray", vmin=0, vmax=255)
         plt.show()
+
+    def save(self, filename: str) -> None:
+        cv2.imwrite(filename,   self.data)
 
 
 class CannyEdgeDetector:
@@ -138,27 +142,16 @@ class CannyEdgeDetector:
                             break
                     if found == False:
                         double_threshold_image[i][j] = 0
-        return Image(data=double_threshold_image)
+        return Image(data=double_threshold_image)        
 
+def process(input_path: str, ouput_path: str):
+    img = Image(input_path)
+    ced = CannyEdgeDetector(img)
+    processed_img = ced.hystheresisTracking()
+    processed_img.save(ouput_path)
 
 if __name__ == '__main__':
-    img = Image('img/women.jpg')
-    ced = CannyEdgeDetector(img)
+    input_path = sys.argv[1]
+    ouput_path = sys.argv[2]
 
-    img.plot()
-
-    gauss_filter_img = ced.gaussianFilter()
-    gauss_filter_img.plot()
-
-    grads = ced.intensityGradient()[0]
-    img_grads = Image(data=grads)
-    img_grads.plot()
-
-    suppression = ced.nonMaximumSuppression()
-    suppression.plot()
-
-    double_thresholding = ced.doubleThreshold()
-    double_thresholding.plot()
-
-    hysteresis = ced.hystheresisTracking()
-    hysteresis.plot()
+    process(input_path, ouput_path)
