@@ -3,7 +3,7 @@ Edge detection in images using canny edge detection algorithm.
 
 # How to Run
 1. Clone the repo
-2. Run: python main.py input_file_path output_file_path
+2. Run: ```python main.py input_image_path output_image_path```
 
 # Demo
 
